@@ -72,6 +72,11 @@ def dummy_nlg_english(bulletin: dict) -> dict:
 __DST2018 = (datetime(2018, 3, 11), datetime(2018, 11, 4))
 __DST2019 = (datetime(2019, 3, 10), datetime(2019, 11, 3))
 
+def get_delta_with_utc(bulletin):
+    issue_date = datetime(bulletin['header'][4], bulletin['header'][5], bulletin['header'][6])
+    is_dst = __DST2018[0] <= issue_date < __DST2018[1] or __DST2019[0] <= issue_date < __DST2019[1]
+    return +4 if is_dst else +5
+    
 
 def get_time_interval_for_period(bulletin: dict, period: str) -> tuple:
     """
@@ -81,9 +86,9 @@ def get_time_interval_for_period(bulletin: dict, period: str) -> tuple:
     :return: A tuple (start hour, end hour) in UTC, i.e. the same timezone as the hours in the meteocode data.
     """
     issue_time_utc = bulletin['header'][7]  # e.g. 2045 (always UTC)
-    issue_date = datetime(bulletin['header'][4], bulletin['header'][5], bulletin['header'][6])
-    is_dst = __DST2018[0] <= issue_date < __DST2018[1] or __DST2019[0] <= issue_date < __DST2019[1]
-    delta_with_utc = +4 if is_dst else +5
+    # issue_date = datetime(bulletin['header'][4], bulletin['header'][5], bulletin['header'][6])
+    # is_dst = __DST2018[0] <= issue_date < __DST2018[1] or __DST2019[0] <= issue_date < __DST2019[1]
+    delta_with_utc = get_delta_with_utc(bulletin)
     issue_time_local = issue_time_utc - delta_with_utc * 100
     station = bulletin['header'][0]
 
