@@ -567,7 +567,7 @@ def processCorpus(inJsonlFN):
     
 ### make sure that a jsRealB server is started in a terminal, using the following call
 ##    node ../jsRealB/dist/jsRealB-server-dme.js ../data/weatherLexicon.js
-showData=True
+showData=False
 
 if __name__ == '__main__':
     inputFN = sys.argv[1] if len(sys.argv)>1 else \

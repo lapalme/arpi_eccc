@@ -1,11 +1,13 @@
-import json
-import sys
+import json,sys,re
+
 from ppJson import ppJson
 from genBulletin import forecast
 
 from arpi_eccc.nlg_evaluation import bleu_evaluation
 from arpi_eccc.utils import get_nb_tokens, get_time_interval_for_period
 from nltk.tokenize import word_tokenize
+
+from levenshtein import compareLevenshtein
 
 def countWords(input_filename):
     # read the bulletins and count words
@@ -29,7 +31,17 @@ def getSampleBulletin(input_filename):
         cur_line = next(fin)
         return json.loads(cur_line)
 
-    
+def getNumericTokens(toks):
+    return [tok for period in toks 
+             for sent in toks[period] 
+                 for tok in sent if re.fullmatch(r"\b\d+(\.\d+)?\b",tok)]
+
+def compareNT(refNT,jsrNT):
+    print(refNT)
+    print(jsrNT)
+    (editDist,editOps)=compareLevenshtein(" ".join(jsrNT)," ".join(refNT),equals=lambda s1,s2:s1==s2)
+    print(editDist)
+    print(editOps)     
 
 def main():
     """A quick demo to show how to start this project."""
@@ -60,7 +72,7 @@ def main():
     ### make sure that a jsRealB server is started in a terminal, using the following call
     ###    node ../jsRealB/dist/jsRealB-server-dme.js ../data/weatherLexicon.js
     
-    print("Running jsRealB ...")
+    print("Running jsRealB on :",input_filename)
     
     reference   = []
     jsr_results = []
@@ -69,6 +81,7 @@ def main():
         for cur_line in fin:
             bulletin = json.loads(cur_line)
             reference.append(bulletin['en']["tok"])
+            refNT=getNumericTokens(bulletin['en']["tok"])
             jsrTok={}
             bulletin_periods = bulletin['en']['tok'].keys()
             for period in bulletin_periods:
@@ -76,6 +89,9 @@ def main():
                 jsrSents=forecast(bulletin,"en","*title*",beginHour,endHour,"")
                 jsrTok[period]=[word_tokenize(sent,{'en':'english','fr':'french'}[lang]) for sent in jsrSents]
             jsr_results.append(jsrTok)
+            jsrNT=getNumericTokens(jsrTok)
+            compareNT(refNT,jsrNT)
+            sys.exit(1)
             if len(reference)%100==0:
                 print(len(reference))
             # if len(reference) >= 1000:
