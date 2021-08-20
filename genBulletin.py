@@ -446,29 +446,6 @@ def forecast(fc,lang,title,beginHour,endHour,text):
     # return textwrap.fill(title+".."+" ".join([fmt(s,lang) for s in res if s!=None]),width=70)
     return [fmt(s,lang) for s in res if s!=None]
 
-# ## start and end hour of each "period" of a bulletin
-# earlyAM ={"today":(5,18),              # EST (0,13)   DST (1,14)
-#           "tonight":(18,30),           # EST (13,25)  DST (14,26)
-#           "tomorrow":(30,42),          # EST (25,37)  DST (26,41)
-#          }
-# lateAM = {"today":(12,18),             # EST (7,13)   DST (6,14)
-#           "tonight":(18,30),           # EST (13,25)  DST (14,26)
-#           "tomorrow":(30,42),          # EST (25,37)  DST (26,38)
-#          }
-# latePM = {"tonight":(16,30),           # EST (11,25)  DST (12,26)
-#           "tomorrow":(30,42),          # EST (25,37)  DST (26,41)
-#           "tomorrow_night":(42,54)     # EST (37,49)  DST (38,50)
-#          }
-#
-# bulletinHours = {
-#    "FPCN71":{"0500":earlyAM, "1130":lateAM, "1545":latePM},
-#    "FPCN73":{"0500":earlyAM, "1130":lateAM, "1545":latePM},
-#    "FPCN74":{"0500":earlyAM, "1130":lateAM, "1545":latePM},
-#    "FPTO11":{"0500":earlyAM, "1100":lateAM, "1530":latePM},
-#    "FPTO12":{"0530":earlyAM, "1130":lateAM, "1600":latePM},
-#    "FPTO13":{"0530":earlyAM, "1130":lateAM, "1600":latePM},
-# }
-
 titles = {
     "today":   {"en":"Today",   "fr":"Aujourd'hui"},
     "tonight": {"en":"Tonight", "fr":"Ce soir et cette nuit"},
@@ -481,10 +458,6 @@ tzS   = None
 beginTime=None
 tzHours=None
 tzShift=None  
-
-# # taken from https://en.wikipedia.org/wiki/Daylight_saving_time_in_the_United_States
-# DST2018=datetime(2018,3,11), datetime(2018,11,4)
-# DST2019=datetime(2019,3,10), datetime(2019,11,3)
 
 def getTimeInfo(fc,lang):
     global tzHours,tzShift,tzS

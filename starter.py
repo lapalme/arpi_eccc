@@ -2,6 +2,7 @@ import json,sys,re
 
 from ppJson import ppJson
 from genBulletin import forecast
+from time import process_time
 
 from arpi_eccc.nlg_evaluation import bleu_evaluation
 from arpi_eccc.utils import get_nb_tokens, get_time_interval_for_period
@@ -37,12 +38,14 @@ def getNumericTokens(toks):
                  for tok in sent if re.fullmatch(r"\b\d+(\.\d+)?\b",tok)]
 
 def compareNT(refNT,jsrNT):
-    print(refNT)
-    print(jsrNT)
     (editDist,editOps)=compareLevenshtein(" ".join(jsrNT)," ".join(refNT),equals=lambda s1,s2:s1==s2)
-    print(editDist)
-    print(editOps)     
+    print("ref:",refNT)
+    print("gen:",jsrNT)
+    print("dist:%d score=%5.2f"%(editDist,editDist/len(refNT)))
+    print(editOps)
+    return editDist/len(refNT)
 
+startTime=process_time()
 def main():
     """A quick demo to show how to start this project."""
     if len(sys.argv) != 2:
@@ -70,13 +73,15 @@ def main():
     # # =============================================================================================
     # try and evaluate the jsRealB generation system for English
     ### make sure that a jsRealB server is started in a terminal, using the following call
-    ###    node ../jsRealB/dist/jsRealB-server-dme.js ../data/weatherLexicon.js
+    ###    node jsRealB/dist/jsRealB-server-dme.js ../data/weatherLexicon.js
     
-    print("Running jsRealB on :",input_filename)
+    print("%6.2f :: Running jsRealB on :%s"%(process_time()-startTime,input_filename))
     
     reference   = []
     jsr_results = []
     lang = "en"
+    numericDiffs=0
+    
     with open(input_filename, 'rt', encoding='utf-8') as fin:
         for cur_line in fin:
             bulletin = json.loads(cur_line)
@@ -90,21 +95,21 @@ def main():
                 jsrTok[period]=[word_tokenize(sent,{'en':'english','fr':'french'}[lang]) for sent in jsrSents]
             jsr_results.append(jsrTok)
             jsrNT=getNumericTokens(jsrTok)
-            compareNT(refNT,jsrNT)
-            sys.exit(1)
+            numericDiffs+=compareNT(refNT,jsrNT)
             if len(reference)%100==0:
-                print(len(reference))
+                print("%6.2f :: %d %5.2f"%(process_time()-startTime,len(reference),numericDiffs/len(reference)))
             # if len(reference) >= 1000:
             #     break
     print("*** reference:%d"%len(reference))
     # ppJson(sys.stdout,reference)
     print("*** jsRealB results:%d"%len(jsr_results))
     # ppJson(sys.stdout,jsr_results)
-
+    print("%6.2f ::*** numeric differences:%5.3f %5.2f"%(process_time()-startTime,numericDiffs,numericDiffs/len(reference)))
     # ...now we can evaluate jsRealB using the two lists created above.
     evaluation = bleu_evaluation(jsr_results, reference)
     for period in ['today', 'tonight', 'tomorrow', 'tomorrow_night']:
-        print(f"For bulletin period {period}, BLEU score is {evaluation[period]:.3f} on a scale from 0 to 1")
+        if evaluation[period]!=-1:
+            print(f"For bulletin period {period}, BLEU score is {evaluation[period]:.3f} on a scale from 0 to 1")
     print()
     print(f"Global score is {evaluation['global']:.3f}")
 

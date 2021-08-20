@@ -13,14 +13,15 @@ def bleu_evaluation(nlg_results: list, reference: list) -> dict:
     must be in the same order as that of nlg_results, i.e. nlg_result[0] is the NLG result corresponding to reference[0]
     and so on.
     :return: A dictionary containing evaluation results. There is a BLEU score for each of the following keys:
-    today, tonight, tomorrow, tomorrow_night, and global. A BLEU score ranges from 0 (very poor) to 1 (perfect).
+    today, tonight, tomorrow, tomorrow_night, and global. A BLEU score ranges from 0 (very poor) to 1 (perfect). If a
+    period is not covered by the hypotheses and references, then its BLEU score will be -1 by convention.
     """
     assert len(nlg_results) == len(reference), "Results and references of different lengths!"
 
     periods = ['today', 'tonight', 'tomorrow', 'tomorrow_night']
     hypothesis_corpus = {x: [] for x in periods}
     reference_corpus = {x: [] for x in periods}
-    bleu_result = {x: -1.0 for x in periods}
+    bleu_result = {x: -1 for x in periods}
 
     for res, ref in zip(nlg_results, reference):
         assert res.keys() == ref.keys(), "Result and reference with different periods."
@@ -29,7 +30,8 @@ def bleu_evaluation(nlg_results: list, reference: list) -> dict:
             reference_corpus[period].append([[item for sublist in ref[period] for item in sublist]])
 
     for period in periods:
-        bleu_result[period] = corpus_bleu(reference_corpus[period], hypothesis_corpus[period])
+        if len(reference_corpus[period]) != 0:
+            bleu_result[period] = corpus_bleu(reference_corpus[period], hypothesis_corpus[period])
 
     # global BLEU by concatenating all sentences and produce global score
     global_hypothesis = list(itertools.chain(*[hypothesis_corpus[x] for x in periods]))
