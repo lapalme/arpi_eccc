@@ -1,8 +1,5 @@
 ## information that should come from a database or an text file
-from arpi_eccc.utils import get_delta_with_utc, get_time_interval_for_period
-
-
-
+import locale
 ###   global header information
 forecastAreas = {
     "FPTO11":{"en":"Southern Ontario and the National Capital Region",
@@ -26,4 +23,25 @@ periodNames = {
     "day_2_night":{"en":"%A night","fr":"Demain soir et nuit"},
 }
 
-        
+def get_period_name(dt,period,lang):
+    if period.startswith("day_2"):
+        locale.setlocale(locale.LC_ALL,"en_US" if lang=="en" else "fr_FR")
+        return dt.strftime(periodNames[period][lang])
+    return periodNames[period][lang]
+
+##  table 5.3
+time_periods = [
+    ( 0, 3,"after midnight","après minuit"),
+    ( 4, 6,"before morning","avant le matin"),
+    ( 0, 6,"over night",    "dans la nuit"),
+    ( 6, 9,"early morning", "tôt le matin"),
+    ( 9,12,"late morning",  "tard le matin"),
+    (11,13,"near noon",     "vers midi"),
+    ( 6,12,"in the morning","le matin"),
+    (12,15,"early afternoon","tôt l'après-midi" ),
+    (15,18,"late afternoon", "tard l'après-midi"),
+    (12,18,"in the afternoon","l'après-midi"),
+    (18,21,"early evenig",    "tôt le soir" ),
+    (21,24,"late evening",    "tard le soir"),
+    (18,24,"in the evening",  "le soir"),
+]

@@ -10,9 +10,10 @@
 import sys,re,textwrap, json, locale
 
 from datetime import datetime,timedelta
-from ECdata import get_forecast_area, periods, periodNames
+from ECdata import get_forecast_area, periods, get_period_name
 from arpi_eccc.utils import get_delta_with_utc, get_time_interval_for_period
 from MeteoCode import MeteoCode
+from forecast import forecast_period
 
 trace=False
 
@@ -30,11 +31,6 @@ def getTimeDateDay(dt,lang):
             re.sub(r"^0","",dt.strftime("%A %d %B %Y")),
             dt.strftime(" %A"))
 
-def get_period_name(dt,period,lang):
-    if period.startswith("day_2"):
-        locale.setlocale(locale.LC_ALL,"en_US" if lang=="en" else "fr_FR")
-        return dt.strftime(periodNames[period][lang])
-    return periodNames[period][lang]
     
 def title_block(mc,lang):
     if trace: print("title_block")
@@ -61,7 +57,6 @@ def forecast_regions(mc,lang):
     regions[-1]=regions[-1]+"."# add full stop at the end of regions
     return regions
 
-from forecast import forecast_period
 
 def forecast_text(mc,lang):
     """ Section 2.2.2 """

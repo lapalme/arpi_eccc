@@ -19,6 +19,7 @@ class MeteoCode(object):
         hdr=json["header"]
         self.issue_date=datetime(hdr[4],hdr[5],hdr[6],hour=hdr[7]//100,minute=hdr[7]%100)
         self.next_issue_date=datetime(hdr[10],hdr[11],hdr[12],hour=hdr[13]//100,minute=hdr[13]%100)
+        self.delta=get_delta_with_utc(json)
     
     def get_header(self):
         return self.data["header"]
@@ -32,6 +33,9 @@ class MeteoCode(object):
     def get_next_issue_date(self):
         return self.next_issue_date
     
+    def get_delta_with_utc(self):
+        return self.delta
+    
     def get_original_bulletin(self,lang):
         if lang in self.data:
             return self.data[lang]["orig"]
@@ -40,11 +44,10 @@ class MeteoCode(object):
     
     #### HACK: specific for Ontario and Québec
     def get_timezone(self,lang):
-        delta=get_delta_with_utc(self.data)
         if lang=="en":
-            return "DST" if delta==4 else "EST"
+            return "DST" if self.delta==4 else "EST"
         else:
-            return "HAE" if delta==4 else "HNE"
+            return "HAE" if self.delta==4 else "HNE"
     
     
     ### query information
@@ -89,4 +92,7 @@ class MeteoCode(object):
         # print("temps")
         # print(temps)
         return temps
+    
+    def get_precipitation(self,period):
+        return self.extract_range(period,"pcpn")
     

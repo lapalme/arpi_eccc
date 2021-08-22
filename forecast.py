@@ -4,6 +4,13 @@ Created on 21 août 2021
 @author: lapalme
 '''
 import sys
+from ECdata import get_period_name, time_periods
+
+def make_sentence(*s):
+    s=" ".join(e for e in s if e!=None and e!="")
+    s = s[0].upper()+s[1:]
+    if not s.endswith("."):s+="."
+    return s
 
 ## sky condition
 
@@ -129,21 +136,21 @@ def temperature(mc,period,lang):
     iMin=tVals.index(minTemp)
     # print(period,"min:",minTemp,iMin,"max:",maxTemp,iMax,tVals)
     dn= "night" if period in ["tonight","day_2_night"] else "day"
-    (t1,t2)=(maxTemp,minTemp) if dn=="night" else (minTemp,maxTemp)
-    if maxTemp >= minTemp+3:
+    (t1,t2,i1,i2)=(maxTemp,minTemp,iMax,iMin) if dn=="night" else (minTemp,maxTemp,iMin,iMax)
+    if t1 >= t2+3:
         # abnormal change time
-        if iMin <=1 :
+        if i1 <=1 :
             return abnormal[dn]["a"][lang](t1, period)
         else:
-            if iMin < 6:
+            if i1 < 6:
                 rest=tVals[iMin:]
-                if all([abs(t-minTemp)<=2 for t in rest]):
+                if all([abs(t-t1)<=2 for t in rest]):
                     # c) remains +/- 2 for the rest
                     return abnormal[dn]["c"][lang](t1,period)
-                elif any([t-minTemp>2 for t in rest]):
+                elif any([t-t1>2 for t in rest]):
                     # d) rises more than 2 for the rest 
                     return abnormal[dn]["d"][lang](t1,period)
-                elif any([minTemp-t>2 for t in rest]):
+                elif any([t1-t>2 for t in rest]):
                     # e) falls more than 2 for the rest (this should never happen!!!)
                     return abnormal[dn]["e"][lang](t1,period)
             else:
@@ -151,8 +158,69 @@ def temperature(mc,period,lang):
                 return abnormal[dn]["b"][lang](t2,t1,period)
     return (("high" if lang=="en" else "maximum")+" "+tVal(maxTemp,lang))
 
-def precipitation(mc,period,lang):
+### precipitation
+# pcpn : start end certainty code type intensity frequency exception?
+
+## very simplified method: we take each info and output its type...
+
+#     certainty : "certain" | "possible" | "risque" =>
+#                 "certain" | "possible" | "risk"
+#     code : "debut" | "debut_fin" | "exact" | "fin" =>
+#            "start" | "start_end" | "exact" | "end"
+#     type : "averses" | "averses_neige" | "averses_neige_fondante" | "blizzard" | 
+#            "bourrasques_neige" | "bruine" | "bruine_verglacante" | 
+#            "cristaux_glace" |"grele"| "gresil" | "neige" | "neige_fondante" | 
+#            "orages" | "pluie" | "pluie_verglacante" | "poudrerie" 
+#            =>
+#            "showers" | "flurries" | "wet flurries" | "blizzard" | 
+#            "snow squalls" | "drizzle" | "freezing drizzle" | 
+#            "ice crystals" |"hail"| "ice pellets" | "snow" | "wet snow" | 
+#            "thunderstorm" | "rain" | "freezing rain" | "blowing snow"
+#     intensity : "faible" | "fort" | "modere" | "nil" | "tres_faible" =>
+#                 "light" | "heavy" | "moderate" | *implicit* | "very light"
+#     frequency : "bref" | "continuel" | "frequent" | "occasionnel" | "peu" =>
+#                 "brief" | "continual" | "frequent" | "occasionnal" | "few"
+#     exception : embedded list of pcpn
+
+precipitation_types = { 
+    "averses":{"en":"showers",     "fr":"averses"},
+    "neige"  :{"en":"snow",        "fr":"neige"},
+    "pluie"  :{"en":"rain",        "fr":"pluie"},
+    "orages" :{"en":"thunderstorm","fr":"orages"},
+    #TODO: add all other types
+}
+
+
+def get_time_period(time):
+    for tp in time_periods:
+        if tp[0]<=time and time < tp[1]:
+            return tp
     return None
+    
+
+def precipitation(mc,period,lang):
+    pcpns=mc.get_precipitation(period)
+    delta=mc.get_delta_with_utc()
+#     print("pcpns\n",pcpns)
+    if pcpns==None: return None
+    sents=[]
+    timePeriod=""
+    for pcpn in pcpns:
+        pType=pcpn[4]
+        pCode=pcpn[3]
+        if pCode.startswith("debut"):
+            tp=get_time_period((pcpn[0]-delta)%24)
+            if tp!=None:
+                timePeriod=("beginning "+tp[2]) if lang=="en" else ("débutant "+tp[3])
+        elif pCode=="fin":
+            tp=get_time_period((pcpn[1]-delta)%24)
+            if tp!=None:
+                timePeriod=("ending "+tp[2]) if lang=="en" else ("finissant "+tp[3])
+        if pType in precipitation_types:
+            sents.append(make_sentence(precipitation_types[pType][lang],timePeriod))
+        else:
+            sents.append("[["+pType+"]].")
+    return " ".join(sents)
 
 def weather_events(mc,period,lang):
     return None
