@@ -156,7 +156,7 @@ def temperature(mc,period,lang):
             else:
                 # b) low temperature after the beginning (but no special case)
                 return abnormal[dn]["b"][lang](t2,t1,period)
-    return (("high" if lang=="en" else "maximum")+" "+tVal(maxTemp,lang))
+    return make_sentence(("high" if lang=="en" else "maximum")+" "+tVal(maxTemp,lang))
 
 ### precipitation
 # pcpn : start end certainty code type intensity frequency exception?
