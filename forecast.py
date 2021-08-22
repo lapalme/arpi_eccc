@@ -1,0 +1,182 @@
+'''
+Created on 21 août 2021
+
+@author: lapalme
+'''
+import sys
+
+## sky condition
+
+sky_condition_terminology = { ## row numbers in the table of section 5.8
+    "r1":{"en":("Sunny","Clear"),
+          "fr":("Ensoleillé","Dégagé")},
+    "r2":{"en":("Mainly Sunny","A few clouds"),
+          "fr":("Généralement ensoleillé","Quelques nuages")},
+    "r3":{"en":("A mix of sun and cloud","Partly cloudy"),
+          "fr":("Alternance de soleil et de nuages","Partiellement couvert")},
+    "r4":{"en":("Mainly cloudy","Mainly cloudy"),
+          "fr":("Généralement nuageux","Généralement nuageux")},
+    "r5":{"en":("Cloudy","Cloudy"),
+          "fr":("Nuageux","Nuageux")},
+    "r6":{"en":("Overcast","Overcast"),
+          "fr":("Couvert","Couvert")},
+    "r7":{"en":("Increasing cloudiness","Increasing cloudiness"),
+          "fr":("Ennuagement","Ennuagement")},
+    "r8":{"en":("Clearing","Clearing"),
+          "fr":("Dégagement","Dégagement")},
+}
+
+def sky_condition(mc,period,lang):
+    """ Section 2.3.6 and 5.8"""
+    ### ciel: start end neb-start neb-end {ceiling-height}
+    sc=mc.get_sky_condition(period)
+    if sc==None: return None
+    # print(period,sc)
+    dayNight = 0 if period in ["today","day_2"] else 1 
+    valStart=sc[0][2]
+    valEnd  =sc[-1][3]
+    if valStart==valEnd:
+        if valStart in [0,1]: 
+            return sky_condition_terminology["r1"][lang][dayNight]+"."
+        if valStart in [2,3]: 
+            return sky_condition_terminology["r2"][lang][dayNight]+"."
+        if valStart in [4,5,6]: 
+            return sky_condition_terminology["r3"][lang][dayNight]+"."
+        if valStart in [7,8]: 
+            return sky_condition_terminology["r4"][lang][dayNight]+"."
+        if valStart in [9]: 
+            return sky_condition_terminology["r5"][lang][dayNight]+"."
+        if valStart in [10]: 
+            return sky_condition_terminology["r6"][lang][dayNight]+"."
+    elif valStart in [0,1,2,3] and valEnd in [7,8,9,10]:
+        return sky_condition_terminology["r7"][lang][dayNight]+"."
+    elif (valStart in [7,8,9,10] and valEnd in [0,1,2,3]) or \
+         (valStart in [5,6]      and valEnd in [0,1]):
+        return sky_condition_terminology["r8"][lang][dayNight]+"."
+    return None
+
+### temperature
+
+def tVal(val,lang):
+    if val==0 : return "zero" if lang=="en" else "zéro"
+    if val< 0 : return ("minus" if lang=="en" else "moins") +str(-val)
+    if val<=5 : return "plus"+str(val)
+    return str(val)
+
+def pVal(p):    
+    return "this" if p in ["today","tonight"] else "in the"
+
+abnormal = {
+    "night":{
+        "a":{
+            "en":lambda t,_:(f"Temperature rising to {tVal(t,'en')} by morning."),
+            "fr":lambda t,_:(f"Températures à la hausse pour atteindre {tVal(t,'fr')} en matinée.")
+        },
+        "b":{
+            "en":lambda t,u,_:(f"Low {tVal(u,'en')} with temperature rising to {tVal(t,'en')} by morning."),
+            "fr":lambda t,u,_:(f"Minimum {tVal(u,'fr')}. Températures à la hausse pour atteindre {tVal(t,'fr')} en matinée.")
+        },
+        "c":{
+            "en":lambda t,p:(f"Temperature rising to {tVal(t,'en')} {pVal(p)} evening then steady."),
+            "fr":lambda t,_:(f"Températures à la hausse pour atteindre {tVal(t,'fr')} en soirée "+
+                              f"pour ensuite demeurer stables.")
+        },
+        "d":{
+            "en":lambda t,p:(f"Temperature rising to {tVal(t,'en')} {pVal(p)} evening then rising slowly."),
+            "fr":lambda t,_:(f"Températures à la hausse pour atteindre {tVal(t,'fr')} en soirée, "+
+                              f"puis hausse graduelle.")
+        },
+        "e":{
+            "en":lambda t,p:(f"Temperature rising to {tVal(t,'en')} {pVal(p)} evening then falling."),
+            "fr":lambda t,_:(f"Températures à la hausse pour atteindre {tVal(t,'fr')} en soirée,"+
+                              f" pour ensuite être à la baisse.")
+        },
+    },
+    "day":{
+        "a":{
+            "en":lambda t,p:(f"Temperature falling to {tVal(t,'en')} {pVal(p)} afternoon."),
+            "fr":lambda t,_:(f"Températures à la baisse pour atteindre {tVal(t,'fr')} en après-midi.")
+        },
+        "b":{
+            "en":lambda t,u,p:(f"High {tVal(u,'en')} with temperature falling to {tVal(t,'en')} {pVal(p)} afternoon."),
+            "fr":lambda t,u,p:(f"Minimum {tVal(u,'fr')}. Températures à la baisse pour atteindre {tVal(t,'fr')} en matinée.")
+        },
+        "c":{
+            "en":lambda t,p:(f"Temperature falling to {tVal(t,'en')} {pVal(p)} morning then steady."),
+            "fr":lambda t,_:(f"Températures à la baisse pour atteindre {tVal(t,'fr')} en soirée "+
+                              f"pour ensuite demeurer stables.")
+        },
+        "d":{
+            "en":lambda t,p:(f"Temperature falling to {tVal(t,'en')} {pVal(p)} evening then falling slowly."),
+            "fr":lambda t,_:(f"Températures à la hausse pour atteindre {tVal(t,'fr')} en soirée, "+
+                              f"puis baisse graduelle,")
+        },
+        "e":{
+            "en":lambda t,p:(f"Temperature falling to {tVal(t,'en')} {pVal(p)} evening then rising."),
+            "fr":lambda t,_:(f"Températures à la hausse pour atteindre {tVal(t,'fr')} en soirée,"+
+                              f" pour ensuite être à la hausse.")
+        },
+    }
+}    
+ 
+def temperature(mc,period,lang):    
+    ## tVals is an array of temperature values from beginHour to endHour
+    tVals=mc.get_temperature(period)
+    if tVals==None: return None
+    maxTemp=max(tVals)
+    iMax=tVals.index(maxTemp)
+    minTemp=min(tVals)
+    iMin=tVals.index(minTemp)
+    # print(period,"min:",minTemp,iMin,"max:",maxTemp,iMax,tVals)
+    dn= "night" if period in ["tonight","day_2_night"] else "day"
+    (t1,t2)=(maxTemp,minTemp) if dn=="night" else (minTemp,maxTemp)
+    if maxTemp >= minTemp+3:
+        # abnormal change time
+        if iMin <=1 :
+            return abnormal[dn]["a"][lang](t1, period)
+        else:
+            if iMin < 6:
+                rest=tVals[iMin:]
+                if all([abs(t-minTemp)<=2 for t in rest]):
+                    # c) remains +/- 2 for the rest
+                    return abnormal[dn]["c"][lang](t1,period)
+                elif any([t-minTemp>2 for t in rest]):
+                    # d) rises more than 2 for the rest 
+                    return abnormal[dn]["d"][lang](t1,period)
+                elif any([minTemp-t>2 for t in rest]):
+                    # e) falls more than 2 for the rest (this should never happen!!!)
+                    return abnormal[dn]["e"][lang](t1,period)
+            else:
+                # b) low temperature after the beginning (but no special case)
+                return abnormal[dn]["b"][lang](t2,t1,period)
+    return (("high" if lang=="en" else "maximum")+" "+tVal(maxTemp,lang))
+
+def precipitation(mc,period,lang):
+    return None
+
+def weather_events(mc,period,lang):
+    return None
+
+def obstruction_to_visibility(mc,period,lang):
+    return None
+
+def wind(mc,period,lang):
+    return None
+
+def thermal_indices(mc,period,lang):
+    return None
+
+def UV_index(mc,period,lang):
+    return None
+
+def forecast_period(mc,period,lang):
+    return " ".join(filter(lambda l:l!=None,[
+        sky_condition(mc, period, lang),
+        temperature(mc, period, lang),
+        precipitation(mc, period, lang),
+        weather_events(mc, period, lang),
+        obstruction_to_visibility(mc, period, lang),
+        wind(mc, period, lang),
+        thermal_indices(mc, period, lang),
+        UV_index(mc, period, lang)
+    ]))
