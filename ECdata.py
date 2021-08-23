@@ -19,8 +19,8 @@ periods =["today","tonight","day_2","day_2_night"]
 periodNames = {
     "today":      {"en":"Today",   "fr":"Aujourd'hui"},
     "tonight":    {"en":"Tonight", "fr":"Ce soir et cette nuit"},
-    "day_2":      {"en":"%A","fr":"Demain"},
-    "day_2_night":{"en":"%A night","fr":"Demain soir et nuit"},
+    "day_2":      {"en":"%A","fr":"%A"},
+    "day_2_night":{"en":"%A night","fr":"%A soir et nuit"},
 }
 
 def get_period_name(dt,period,lang):

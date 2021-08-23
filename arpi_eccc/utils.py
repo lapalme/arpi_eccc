@@ -91,12 +91,14 @@ def get_time_interval_for_period(bulletin: dict, period: str) -> tuple:
     delta_with_utc = get_delta_with_utc(bulletin)
     issue_time_local = issue_time_utc - delta_with_utc * 100
     station = bulletin['header'][0]
+    if period=="day_2":period="tomorrow"
+    elif period=="day_2_night":period="tomorrow_night"
 
     try:
         local_range = __PERIOD_TO_TIMERANGE[station][period][issue_time_local]
     except KeyError:
         # this happens when a period is missing from the DB for a given issue_time_local. Recovery attempt necessary.
-        # print(f"Invalid issue_time_local: {issue_time_local}", file=sys.stderr)
+#         print(f"Invalid issue_time_local: {issue_time_local}", file=sys.stderr)
         periods = ['today', 'tonight', 'tomorrow', 'tomorrow_night']
         local_range = None
         for recovery_period in periods:

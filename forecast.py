@@ -5,7 +5,9 @@ Created on 21 août 2021
 '''
 # import sys
 from ECdata import get_period_name, time_periods, wind_directions, dir_diff, uv_ranges
+from arpi_eccc.utils import get_delta_with_utc, get_time_interval_for_period
 
+# capitalize first letter and add period 
 def make_sentence(*s):
     s=" ".join(e for e in s if e!=None and e!="")
     s = s[0].upper()+s[1:]
@@ -263,20 +265,32 @@ def thermal_indices(mc,period,lang):
 # indice_uv : start end value
 def UV_index(mc,period,lang):
     uvi=mc.get_uv_index(period)
-    print(period,"uvi\n",uvi)
+#     print(period,"uvi\n",uvi)
     if uvi==None:return None 
+    ## modulate uv with sky condition (as suggestion par Jacques Marcoux EC)
     uvVal=round(uvi[0][2])
+    sc=mc.get_sky_condition(period)
+    if sc!=None:
+#         print(period,"ciel\n",sc)
+        valStart=sc[0][2]
+        valEnd  =sc[-1][3]
+        coverVal=(valStart+valEnd)/2*0.1 # 0= clear 10: covered
+        if coverVal>0.2:
+            uvVal=round(uvVal*(1-coverVal))
+#         print("corrected uval",uvVal)
     for high,expr in uv_ranges:
         if uvVal<=high:
-            return f"UV index {uvVal} or {expr[lang]}" if lang=="en" else \
-                    f"index UV de {uvVal} ou {expr[lang]}" 
+            return make_sentence(f"UV index {uvVal} or {expr[lang]}" if lang=="en" else 
+                                 f"Indice UV de {uvVal} ou {expr[lang]}")
     return None
 
 def forecast_period(mc,period,lang):
+#     print("period:",period)
+#     print(get_time_interval_for_period(mc.data, period))
     return " ".join(filter(lambda l:l!=None,[
         sky_condition(mc, period, lang),
-        wind(mc, period, lang),
         precipitation(mc, period, lang),
+        wind(mc, period, lang),
         weather_events(mc, period, lang),
         obstruction_to_visibility(mc, period, lang),
         temperature(mc, period, lang),
