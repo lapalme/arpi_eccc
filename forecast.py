@@ -3,8 +3,8 @@ Created on 21 août 2021
 
 @author: lapalme
 '''
-import sys
-from ECdata import get_period_name, time_periods
+# import sys
+from ECdata import get_period_name, time_periods, wind_directions, dir_diff, uv_ranges
 
 def make_sentence(*s):
     s=" ".join(e for e in s if e!=None and e!="")
@@ -228,23 +228,58 @@ def weather_events(mc,period,lang):
 def obstruction_to_visibility(mc,period,lang):
     return None
 
+
+## vents : start end direction modif? speed value exception?
 def wind(mc,period,lang):
-    return None
+    winds=mc.get_wind_direction(period)
+    # print(period,"winds\n",winds)
+    if winds==None:return None
+    lastSpeed=None 
+    lastDir=None
+    sent=""
+    # TODO: deal with "gust"...
+    for wnd in winds:
+        wSpeed = wnd[4]
+        wDir= wnd[2]
+        if wSpeed>=20 and wDir in wind_directions:
+            if lastSpeed!=None and abs(wSpeed-lastSpeed)>=20:
+                lastSpeed=wSpeed
+                wSpeed=round(wSpeed/10)*10
+                sent+=(" increasing to " if lang=="en" else " augmentant à ")+str(wSpeed)
+            elif lastSpeed!=None and dir_diff(wDir, lastDir):
+                sent+=(" becoming " if lang=="en" else " devenant ")+wind_directions[wDir][lang]
+                lastDir=wDir
+            else:
+                lastSpeed=wSpeed
+                lastDir=wDir
+                wSpeed=round(wSpeed/10)*10
+                sent=("wind" if lang=="en" else "vents")+" "+str(wSpeed)+" km/h "+\
+                       wind_directions[wDir][lang]   
+    return make_sentence(sent)
 
 def thermal_indices(mc,period,lang):
     return None
 
+# indice_uv : start end value
 def UV_index(mc,period,lang):
+    uvi=mc.get_uv_index(period)
+    print(period,"uvi\n",uvi)
+    if uvi==None:return None 
+    uvVal=round(uvi[0][2])
+    for high,expr in uv_ranges:
+        if uvVal<=high:
+            return f"UV index {uvVal} or {expr[lang]}" if lang=="en" else \
+                    f"index UV de {uvVal} ou {expr[lang]}" 
     return None
 
 def forecast_period(mc,period,lang):
     return " ".join(filter(lambda l:l!=None,[
         sky_condition(mc, period, lang),
-        temperature(mc, period, lang),
+        wind(mc, period, lang),
         precipitation(mc, period, lang),
         weather_events(mc, period, lang),
         obstruction_to_visibility(mc, period, lang),
-        wind(mc, period, lang),
+        temperature(mc, period, lang),
         thermal_indices(mc, period, lang),
         UV_index(mc, period, lang)
     ]))

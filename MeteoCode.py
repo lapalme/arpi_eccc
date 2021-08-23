@@ -96,3 +96,9 @@ class MeteoCode(object):
     def get_precipitation(self,period):
         return self.extract_range(period,"pcpn")
     
+    def get_wind_direction(self,period):
+        return self.extract_range(period, "vents")
+    
+    def get_uv_index(self,period):
+        return self.extract_range(period,"indice_uv")
+    

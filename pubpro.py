@@ -10,7 +10,7 @@
 import sys,re,textwrap, json, locale
 
 from datetime import datetime,timedelta
-from ECdata import get_forecast_area, periods, get_period_name
+from ECdata import get_forecast_area, periods, get_period_name, uv_ranges
 from arpi_eccc.utils import get_delta_with_utc, get_time_interval_for_period
 from MeteoCode import MeteoCode
 from forecast import forecast_period
