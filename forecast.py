@@ -4,8 +4,9 @@ Created on 21 août 2021
 @author: lapalme
 '''
 # import sys
-from ECdata import get_period_name, time_periods, wind_directions, dir_diff, uv_ranges
+from ECdata import get_period_name, time_periods,get_time_period_name, wind_directions, dir_diff, uv_ranges
 from arpi_eccc.utils import get_delta_with_utc, get_time_interval_for_period
+from pickle import NONE
 
 # capitalize first letter and add period 
 def make_sentence(*s):
@@ -192,18 +193,12 @@ precipitation_types = {
     #TODO: add all other types
 }
 
-
-def get_time_period(time):
-    for tp in time_periods:
-        if tp[0]<=time and time < tp[1]:
-            return tp
-    return None
     
 
 def precipitation(mc,period,lang):
     pcpns=mc.get_precipitation(period)
     delta=mc.get_delta_with_utc()
-#     print("pcpns\n",pcpns)
+#     print(period,"pcpns\n",pcpns)
     if pcpns==None: return None
     sents=[]
     timePeriod=""
@@ -211,18 +206,31 @@ def precipitation(mc,period,lang):
         pType=pcpn[4]
         pCode=pcpn[3]
         if pCode.startswith("debut"):
-            tp=get_time_period((pcpn[0]-delta)%24)
+            tp=get_time_period_name((pcpn[0]-delta)%24,lang)
             if tp!=None:
-                timePeriod=("beginning "+tp[2]) if lang=="en" else ("débutant "+tp[3])
+                timePeriod=("beginning "+tp) if lang=="en" else ("débutant "+tp)
         elif pCode=="fin":
-            tp=get_time_period((pcpn[1]-delta)%24)
+            tp=get_time_period_name((pcpn[1]-delta)%24,lang)
             if tp!=None:
-                timePeriod=("ending "+tp[2]) if lang=="en" else ("finissant "+tp[3])
+                timePeriod=("ending "+tp) if lang=="en" else ("finissant "+tp)
         if pType in precipitation_types:
             sents.append(make_sentence(precipitation_types[pType][lang],timePeriod))
         else:
             sents.append("[["+pType+"]].")
-    return " ".join(sents)
+    pcpnAmount=mc.get_precipitation_amount(period)
+    # print(period,"pcpnAmount\n",pcpnAmount)
+    if pcpnAmount!=None:
+        accumAmount=pcpnAmount[-1][5]
+        if len(pcpnAmount[-1])>6 and isinstance(pcpnAmount[-1][6],int):
+            accumAmount=pcpnAmount[-1][6]
+        pcpnType=pcpnAmount[-1][2]
+        if pcpnType=="pluie":
+            if accumAmount>25:
+                sents.append(("amount " if lang=="en" else "hauteur prévue de ")+str(accumAmount)+" mm")
+        elif pcpnType=="neige":
+            if accumAmount>2:
+                sents.append(("amount " if lang=="en" else "hauteur prévue de ")+str(accumAmount)+" cn")
+    return " ".join([make_sentence(sent) for sent in sents])
 
 def weather_events(mc,period,lang):
     return None
@@ -234,6 +242,7 @@ def obstruction_to_visibility(mc,period,lang):
 ## vents : start end direction modif? speed value exception?
 def wind(mc,period,lang):
     winds=mc.get_wind_direction(period)
+    delta=mc.get_delta_with_utc()
     # print(period,"winds\n",winds)
     if winds==None:return None
     lastSpeed=None 
@@ -248,16 +257,24 @@ def wind(mc,period,lang):
                 lastSpeed=wSpeed
                 wSpeed=round(wSpeed/10)*10
                 sent+=(" increasing to " if lang=="en" else " augmentant à ")+str(wSpeed)
-            elif lastSpeed!=None and dir_diff(wDir, lastDir):
+            elif lastDir!=None and dir_diff(wDir, lastDir):
                 sent+=(" becoming " if lang=="en" else " devenant ")+wind_directions[wDir][lang]
                 lastDir=wDir
             else:
                 lastSpeed=wSpeed
                 lastDir=wDir
                 wSpeed=round(wSpeed/10)*10
-                sent=("wind" if lang=="en" else "vents")+" "+str(wSpeed)+" km/h "+\
-                       wind_directions[wDir][lang]   
-    return make_sentence(sent)
+                sent=("wind" if lang=="en" else "vents")+" "+wind_directions[wDir][lang]+\
+                      " "+str(wSpeed)+" km/h "                       
+            # show gust or time
+            if len(wnd)>5:
+                gust=wnd[5]
+                if gust[2]=='rafales':
+                    sent +=(" gusting to " if lang=="en" else " avec rafales à ")+str(gust[3])
+            else:
+                sent+=" "+get_time_period_name(wnd[0]-delta,lang)
+
+    return make_sentence(sent) if len(sent)>0 else None
 
 def thermal_indices(mc,period,lang):
     return None

@@ -31,21 +31,27 @@ def get_period_name(dt,period,lang):
 
 ##  table 5.3
 time_periods = [
-    ( 0, 3,"after midnight","après minuit"),
-    ( 4, 6,"before morning","avant le matin"),
-    ( 0, 6,"over night",    "dans la nuit"),
-    ( 6, 9,"early morning", "tôt le matin"),
-    ( 9,12,"late morning",  "tard le matin"),
-    (11,13,"near noon",     "vers midi"),
-    ( 6,12,"in the morning","le matin"),
-    (12,15,"early afternoon","tôt l'après-midi" ),
-    (15,18,"late afternoon", "tard l'après-midi"),
-    (12,18,"in the afternoon","l'après-midi"),
-    (18,21,"early evenig",    "tôt le soir" ),
-    (21,24,"late evening",    "tard le soir"),
-    (18,24,"in the evening",  "le soir"),
+    ( 0, 3,{"en":"after midnight","fr":"après minuit"}),
+    ( 4, 6,{"en":"before morning","fr":"avant le matin"}),
+    ( 0, 6,{"en":"over night","fr":"dans la nuit"}),
+    ( 6, 9,{"en":"early morning","fr":"tôt le matin"}),
+    ( 9,12,{"en":"late morning","fr":"tard le matin"}),
+    (11,13,{"en":"near noon","fr":"vers midi"}),
+    ( 6,12,{"en":"in the morning","fr":"le matin"}),
+    (12,15,{"en":"early afternoon","fr":"tôt l'après-midi"} ),
+    (15,18,{"en":"late afternoon","fr":"tard l'après-midi"}),
+    (12,18,{"en":"in the afternoon","fr":"l'après-midi"}),
+    (18,21,{"en":"early evening","fr":"tôt le soir"} ),
+    (21,24,{"en":"late evening","fr":"tard le soir"}),
+    (18,24,{"en":"in the evening","fr":"le soir"}),
 ]
 
+def get_time_period_name(h,lang):
+    h=h%24
+    for (begin,end,expr) in time_periods:
+        if begin<=h and h<end:
+            return expr[lang]
+    return ""
 
 # e | nil | n | ne | nw | w | ely | nly | nely | nwly | wly | sly| sely | swly | sly | sely | sw | vrbl
 wind_directions = {

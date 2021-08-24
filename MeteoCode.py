@@ -53,6 +53,7 @@ class MeteoCode(object):
     ### query information
     def extract_range(self,period, field,column=None):
         (beginHour,endHour)=get_time_interval_for_period(self.data, period)
+        if field not in self.data: return None
         infos=self.data[field]
         nb=len(infos)
         i=0
@@ -91,7 +92,10 @@ class MeteoCode(object):
         temps.extend([tempRanges[i][3]]*(endHour-tempRanges[i][1]))
         # print("temps")
         # print(temps)
-        return temps
+        return temps if len(temps)>0 else None
+    
+    def get_precipitation_amount(self,period):
+        return self.extract_range(period,"accum")
     
     def get_precipitation(self,period):
         return self.extract_range(period,"pcpn")

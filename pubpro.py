@@ -92,43 +92,7 @@ def regular_forecast(mc,lang):
                    for lines in text for line in lines if line!=None])
     return gen
 
-def compare_with_orig(mc,lang):
-    orig=mc.get_original_bulletin(lang)
-    text=[
-#         communication_header(mc,lang),
-#         title_block(mc,lang),
-        forecast_regions(mc,lang),
-        forecast_text(mc,lang),
-#         end_statement(lang),
-     ]    
-    gen = "\n".join([textwrap.fill(line,width=70, subsequent_indent=" ") 
-                   for lines in text for line in lines if line!=None])
-    ### output comparaison with original
-    fmt="%-72s|%s"
-    genL=gen.split("\n")
-    origL=orig.split("\n")
-    lg=len(genL)
-    lo=len(origL)
-    res=[fmt%("*** Generated ***","*** Original ***")]
-    for i in range(0,min(lg,lo)):
-        res.append(fmt%(genL[i],origL[i]))
-    if lg<lo:
-        for i in range(lg,lo):
-            res.append(fmt%("",origL[i]))
-    elif lg>lo:
-        for i in range(lo,lg):
-            res.append(fmt%(genL[i],""))
-    return "\n".join(res)
-
-def compare_all_with_orig(jsonlFN):
-    for line in open(jsonlFN,"r",encoding="utf-8"):
-        mc=MeteoCode(json.loads(line))    
-        print(compare_with_orig(mc, "en"))
-        print("---")
-        print(compare_with_orig(mc, "fr"))
-        print("===")
-        
-
+## only produce full bulletins
 def generate_bulletin(mc,lang):
     text=[
         communication_header(mc,lang),
@@ -148,10 +112,49 @@ def generate_bulletins(jsonlFN):
         print(generate_bulletin(mc,"fr"))
         print("===")
 
-# def my_tokenize(s):
-    # return [[token for token in re.split(r'(\W)',sent) if len(token.strip())>0]+["."]
-             # for sent in s.split(".") if len(sent.strip())>0]
+##  compare three periods only and display result and  original in parallel 
+def compare_with_orig(mc,lang):
+    origB=mc.get_original_bulletin(lang)
+    text=[
+#         communication_header(mc,lang),
+#         title_block(mc,lang),
+        forecast_regions(mc,lang),
+        forecast_text(mc,lang),
+#         end_statement(lang),
+     ]    
+    genB = "\n".join([textwrap.fill(line,width=70, subsequent_indent=" ") 
+                   for lines in text for line in lines if line!=None])
+    ### output comparaison with original
+    
+    fmt="%-72s|%s"
+    res=[fmt%("*** Generated ***","*** Original ***")]
+    periodSplitRE=re.compile(r"\n(?=[A-Z])")
+    for gen,orig in zip(periodSplitRE.split(genB),periodSplitRE.split(origB)):
+        genL=gen.split("\n")
+        origL=orig.split("\n")
+        lg=len(genL)
+        lo=len(origL)
+        for i in range(0,min(lg,lo)):
+            res.append(fmt%(genL[i],origL[i]))
+        if lg<lo:
+            for i in range(lg,lo):
+                res.append(fmt%("",origL[i]))
+        elif lg>lo:
+            for i in range(lo,lg):
+                res.append(fmt%(genL[i],""))
+    return "\n".join(res)
 
+def compare_all_with_orig(jsonlFN):
+    for line in open(jsonlFN,"r",encoding="utf-8"):
+        mc=MeteoCode(json.loads(line))    
+        print(compare_with_orig(mc, "en"))
+        print("---")
+        print(compare_with_orig(mc, "fr"))
+        print("===")
+        # break
+
+
+##  For evaluation
 def getNumericTokens(toks):
     return [tok for period in toks 
              for sent in toks[period] 
@@ -210,8 +213,8 @@ def evaluate(jsonlFN,lang):
 
 def main(jsonlFN):
     # generate_bulletins(jsonlFN)
-    compare_all_with_orig(jsonlFN)
-    # evaluate(jsonlFN,"en")
+    # compare_all_with_orig(jsonlFN)
+    evaluate(jsonlFN,"en")
 
 if __name__ == '__main__':
     main(sys.argv[1] if len(sys.argv)>1 else
