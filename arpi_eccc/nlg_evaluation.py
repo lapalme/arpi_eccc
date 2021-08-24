@@ -24,11 +24,14 @@ def bleu_evaluation(nlg_results: list, reference: list) -> dict:
     bleu_result = {x: -1 for x in periods}
 
     for res, ref in zip(nlg_results, reference):
-        assert res.keys() == ref.keys(), "Result and reference with different periods."
-        for period in res.keys():
-            hypothesis_corpus[period].append([item for sublist in res[period] for item in sublist])
-            reference_corpus[period].append([[item for sublist in ref[period] for item in sublist]])
-
+        if res.keys() == ref.keys():
+            for period in res.keys():
+                hypothesis_corpus[period].append([item for sublist in res[period] for item in sublist])
+                reference_corpus[period].append([[item for sublist in ref[period] for item in sublist]])
+        else:
+            print("Result and reference with different periods.")
+            print("res\n",res)
+            print("ref\n",ref)
     for period in periods:
         if len(reference_corpus[period]) != 0:
             bleu_result[period] = corpus_bleu(reference_corpus[period], hypothesis_corpus[period])
