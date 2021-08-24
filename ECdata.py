@@ -15,16 +15,16 @@ def get_forecast_area(code,lang):
     return forecastAreas[code][lang]
 
 ### periods
-periods =["today","tonight","day_2","day_2_night"]
+periods =["today","tonight","tomorrow","tomorrow_night"]
 periodNames = {
     "today":      {"en":"Today",   "fr":"Aujourd'hui"},
     "tonight":    {"en":"Tonight", "fr":"Ce soir et cette nuit"},
-    "day_2":      {"en":"%A","fr":"%A"},
-    "day_2_night":{"en":"%A night","fr":"%A soir et nuit"},
+    "tomorrow":      {"en":"%A","fr":"%A"},
+    "tomorrow_night":{"en":"%A night","fr":"%A soir et nuit"},
 }
 
 def get_period_name(dt,period,lang):
-    if period.startswith("day_2"):
+    if period.startswith("tomorrow"):
         locale.setlocale(locale.LC_ALL,"en_US" if lang=="en" else "fr_FR")
         return dt.strftime(periodNames[period][lang])
     return periodNames[period][lang]

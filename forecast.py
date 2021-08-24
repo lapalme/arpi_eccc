@@ -41,7 +41,7 @@ def sky_condition(mc,period,lang):
     sc=mc.get_sky_condition(period)
     if sc==None: return None
     # print(period,sc)
-    dayNight = 0 if period in ["today","day_2"] else 1 
+    dayNight = 0 if period in ["today","tomorrow"] else 1 
     valStart=sc[0][2]
     valEnd  =sc[-1][3]
     if valStart==valEnd:
@@ -137,7 +137,7 @@ def temperature(mc,period,lang):
     minTemp=min(tVals)
     iMin=tVals.index(minTemp)
     # print(period,"min:",minTemp,iMin,"max:",maxTemp,iMax,tVals)
-    dn= "night" if period in ["tonight","day_2_night"] else "day"
+    dn= "night" if period in ["tonight","tomorrow_night"] else "day"
     (t1,t2,i1,i2)=(maxTemp,minTemp,iMax,iMin) if dn=="night" else (minTemp,maxTemp,iMin,iMax)
     if t1 >= t2+3:
         # abnormal change time
