@@ -15,6 +15,8 @@ def make_sentence(*s):
     if not s.endswith("."):s+="."
     return s
 
+trace=True
+
 ## sky condition
 
 sky_condition_terminology = { ## row numbers in the table of section 5.8
@@ -41,7 +43,7 @@ def sky_condition(mc,period,lang):
     ### ciel: start end neb-start neb-end {ceiling-height}
     sc=mc.get_sky_condition(period)
     if sc==None: return None
-    # print(period,sc)
+    if trace: print(period,"sky_condition\n",sc)
     dayNight = 0 if period in ["today","tomorrow"] else 1 
     valStart=sc[0][2]
     valEnd  =sc[-1][3]
@@ -69,8 +71,8 @@ def sky_condition(mc,period,lang):
 
 def tVal(val,lang):
     if val==0 : return "zero" if lang=="en" else "zéro"
-    if val< 0 : return ("minus" if lang=="en" else "moins") +str(-val)
-    if val<=5 : return "plus"+str(val)
+    if val< 0 : return ("minus " if lang=="en" else "moins ") +str(-val)
+    if val<=5 : return "plus "+str(val)
     return str(val)
 
 def pVal(p):    
@@ -137,7 +139,7 @@ def temperature(mc,period,lang):
     iMax=tVals.index(maxTemp)
     minTemp=min(tVals)
     iMin=tVals.index(minTemp)
-    # print(period,"min:",minTemp,iMin,"max:",maxTemp,iMax,tVals)
+    if trace: print(period,"min:",minTemp,iMin,"max:",maxTemp,iMax,tVals)
     dn= "night" if period in ["tonight","tomorrow_night"] else "day"
     (t1,t2,i1,i2)=(maxTemp,minTemp,iMax,iMin) if dn=="night" else (minTemp,maxTemp,iMin,iMax)
     if t1 >= t2+3:
@@ -198,8 +200,8 @@ precipitation_types = {
 def precipitation(mc,period,lang):
     pcpns=mc.get_precipitation(period)
     delta=mc.get_delta_with_utc()
-#     print(period,"pcpns\n",pcpns)
     if pcpns==None: return None
+    if trace: print(period,"pcpns\n",pcpns)
     sents=[]
     timePeriod=""
     for pcpn in pcpns:
@@ -218,7 +220,7 @@ def precipitation(mc,period,lang):
         else:
             sents.append("[["+pType+"]].")
     pcpnAmount=mc.get_precipitation_amount(period)
-    # print(period,"pcpnAmount\n",pcpnAmount)
+    if trace: print(period,"pcpnAmount\n",pcpnAmount)
     if pcpnAmount!=None:
         accumAmount=pcpnAmount[-1][5]
         if len(pcpnAmount[-1])>6 and isinstance(pcpnAmount[-1][6],int):
@@ -226,10 +228,10 @@ def precipitation(mc,period,lang):
         pcpnType=pcpnAmount[-1][2]
         if pcpnType=="pluie":
             if accumAmount>25:
-                sents.append(("amount " if lang=="en" else "hauteur prévue de ")+str(accumAmount)+" mm")
+                sents.append(("amount " if lang=="en" else "hauteur prévue de ")+str(round(accumAmount))+" mm")
         elif pcpnType=="neige":
             if accumAmount>2:
-                sents.append(("amount " if lang=="en" else "hauteur prévue de ")+str(accumAmount)+" cn")
+                sents.append(("amount " if lang=="en" else "hauteur prévue de ")+str(round(accumAmount))+" cm")
     return " ".join([make_sentence(sent) for sent in sents])
 
 def weather_events(mc,period,lang):
@@ -243,8 +245,8 @@ def obstruction_to_visibility(mc,period,lang):
 def wind(mc,period,lang):
     winds=mc.get_wind_direction(period)
     delta=mc.get_delta_with_utc()
-    # print(period,"winds\n",winds)
     if winds==None:return None
+    if trace: print(period,"winds\n",winds)
     lastSpeed=None 
     lastDir=None
     sent=""
@@ -282,19 +284,19 @@ def thermal_indices(mc,period,lang):
 # indice_uv : start end value
 def UV_index(mc,period,lang):
     uvi=mc.get_uv_index(period)
-#     print(period,"uvi\n",uvi)
     if uvi==None:return None 
+    if trace: print(period,"uvi\n",uvi)
     ## modulate uv with sky condition (as suggestion par Jacques Marcoux EC)
     uvVal=round(uvi[0][2])
     sc=mc.get_sky_condition(period)
     if sc!=None:
-#         print(period,"ciel\n",sc)
+        if trace: print(period,"ciel\n",sc)
         valStart=sc[0][2]
         valEnd  =sc[-1][3]
         coverVal=(valStart+valEnd)/2*0.1 # 0= clear 10: covered
         if coverVal>0.2:
             uvVal=round(uvVal*(1-coverVal))
-#         print("corrected uval",uvVal)
+        if trace: print("corrected uval",uvVal)
     for high,expr in uv_ranges:
         if uvVal<=high:
             return make_sentence(f"UV index {uvVal} or {expr[lang]}" if lang=="en" else 
@@ -302,8 +304,9 @@ def UV_index(mc,period,lang):
     return None
 
 def forecast_period(mc,period,lang):
-#     print("period:",period)
-#     print(get_time_interval_for_period(mc.data, period))
+    if trace:  
+        print("period:",period)
+        print(get_time_interval_for_period(mc.data, period))
     return " ".join(filter(lambda l:l!=None,[
         sky_condition(mc, period, lang),
         precipitation(mc, period, lang),
