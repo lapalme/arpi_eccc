@@ -192,6 +192,7 @@ precipitation_types = {
     "neige"  :{"en":"snow",        "fr":"neige"},
     "pluie"  :{"en":"rain",        "fr":"pluie"},
     "orages" :{"en":"thunderstorm","fr":"orages"},
+    "averses_neige":{"en":"flurries","fr":"averses de neige"}
     #TODO: add all other types
 }
 
@@ -199,8 +200,8 @@ precipitation_types = {
 
 def precipitation(mc,period,lang):
     pcpns=mc.get_precipitation(period)
-    delta=mc.get_delta_with_utc()
     if pcpns==None: return None
+    delta=mc.get_delta_with_utc()
     if trace: print(period,"pcpns\n",pcpns)
     sents=[]
     timePeriod=""

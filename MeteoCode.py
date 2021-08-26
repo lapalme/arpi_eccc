@@ -55,6 +55,8 @@ class MeteoCode(object):
         (beginHour,endHour)=get_time_interval_for_period(self.data, period)
         if field not in self.data: return None
         infos=self.data[field]
+        if field=="prob": # prob has a peculiar structure (ignore first two elements
+            infos=infos[2:]
         nb=len(infos)
         i=0
         while i<nb and infos[i][1] < beginHour:i+=1
@@ -71,6 +73,19 @@ class MeteoCode(object):
     def get_sky_condition(self,period,column=None):
         return self.extract_range(period,"ciel",column)
 
+
+    ## expand value given at idx in tuples for each hour for all hours within a range
+    def expand_range(self,tuples,idx,beginHour,endHour):
+        res=[]
+        i=0
+        res.extend([tuples[i][idx]]*(tuples[i][1]-beginHour))
+        while i<len(tuples)-1:
+            i+=1
+            res.extend([tuples[i][idx]]*(tuples[i][1]-tuples[i][0]))
+        res.extend([tuples[i][idx]]*(endHour-tuples[i][1]))
+        return res
+        
+    
     # temp : start end trend value
         # trend : "baisse" | "hausse" | "pi" | "max" | "min" | "stationnaire" =>
         #         "falling" | "rising" | "middle point" | "high" | "low" | "steady"
@@ -81,18 +96,21 @@ class MeteoCode(object):
         (beginHour,endHour)=get_time_interval_for_period(self.data, period)
         temps=[]
         tempRanges=self.extract_range(period, "temp")
-        # print("tempRanges")
-        # print(tempRanges)
+        print("tempRanges")
+        print(tempRanges)
         if tempRanges==None: return None
-        i=0
-        temps.extend([tempRanges[0][3]]*(tempRanges[0][1]-beginHour))
-        for i in range(1,len(tempRanges)-1):
-            temps.extend([tempRanges[i][3]]*(tempRanges[i][1]-tempRanges[i][0]))
-        i=len(tempRanges)-1
-        temps.extend([tempRanges[i][3]]*(endHour-tempRanges[i][1]))
-        # print("temps")
-        # print(temps)
+        # probRanges=self.extract(period,"prob")
+        temps=self.expand_range(tempRanges, 3, beginHour, endHour)
+        # i=0
+        # temps.extend([tempRanges[0][3]]*(tempRanges[0][1]-beginHour))
+        # for i in range(1,len(tempRanges)-1):
+        #     temps.extend([tempRanges[i][3]]*(tempRanges[i][1]-tempRanges[i][0]))
+        # i=len(tempRanges)-1
+        # temps.extend([tempRanges[i][3]]*(endHour-tempRanges[i][1]))
+        print("temps")
+        print(temps)
         return temps if len(temps)>0 else None
+    
     
     def get_precipitation_amount(self,period):
         return self.extract_range(period,"accum")

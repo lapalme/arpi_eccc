@@ -154,7 +154,7 @@ def compare_all_with_orig(jsonlFN,max=-1):
         mc=MeteoCode(json.loads(line))
         if re.match(r"fpcn74-2019-12-.*",mc.data["id"]):
             print("%d :: %s"%(no,mc.data["id"]))
-            ppJson(sys.stdout,mc.data)   
+            # ppJson(sys.stdout,mc.data)   
             print(compare_with_orig(mc, "en"))
             # print("---")
             # print(compare_with_orig(mc, "fr"))
