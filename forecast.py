@@ -130,6 +130,8 @@ abnormal = {
         },
     }
 }    
+
+
  
 def temperature(mc,period,lang):    
     ## tVals is an array of temperature values from beginHour to endHour
@@ -278,7 +280,21 @@ def wind(mc,period,lang):
 
     return make_sentence(sent) if len(sent)>0 else None
 
+def wind_chill(t,v):
+    " Équation in section 3.2.1"
+    return round(13.12+0.6215*t-11.37*v**0.16+0.3965*t*v**0.16)
+
 def thermal_indices(mc,period,lang):
+    tVals=mc.get_temperature(period)
+    if tVals==None: return None
+    maxTemp=max(tVals)
+    winds=mc.get_wind_direction(period)
+    if winds==None:return None
+    windSpeed=winds[-1][4]
+    if maxTemp < 0 and windSpeed>=5:
+        return make_sentence(("wind chill " if lang=="en" else "refroidissement éolien de ")+\
+                tVal(wind_chill(maxTemp,windSpeed),lang))
+    
     return None
 
 # indice_uv : start end value
@@ -297,6 +313,7 @@ def UV_index(mc,period,lang):
         if coverVal>0.2:
             uvVal=round(uvVal*(1-coverVal))
         if trace: print("corrected uval",uvVal)
+    if uvVal==0:return None
     for high,expr in uv_ranges:
         if uvVal<=high:
             return make_sentence(f"UV index {uvVal} or {expr[lang]}" if lang=="en" else 
