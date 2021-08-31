@@ -17,8 +17,7 @@ from MeteoCode import MeteoCode
 from forecast import forecast_period
 from ppJson import ppJson
 
-from levenshtein import compareLevenshtein
-
+# from levenshtein import compareLevenshtein
 
 trace=False
 
@@ -124,9 +123,9 @@ def generate_bulletin(mc,lang):
     return "\n".join([textwrap.fill(line,width=70, subsequent_indent=" ") 
                    for lines in text for line in lines if line!=None])
     
-def generate_bulletins(jsonlFN,nb=-1):
+def generate_bulletins(jsonlFile,nb):
     """ Sect 2.2 """
-    for line in open(jsonlFN,"r",encoding="utf-8"):
+    for line in jsonlFile:
         mc=MeteoCode(json.loads(line))    
         print(generate_bulletin(mc,"en"))
         print(generate_bulletin(mc,"fr"))
@@ -165,10 +164,10 @@ def compare_with_orig(mc,lang):
                 res.append(fmt%(genL[i],""))
     return "\n"+"\n".join(res)
 
-def compare_all_with_orig(jsonlFN,rateCompare):
+def compare_all_with_orig(jsonlFile,rateCompare):
     no=0
     nb=0
-    for line in open(jsonlFN,"r",encoding="utf-8"):
+    for line in jsonlFile:
         no+=1
         mc=MeteoCode(json.loads(line))
         # if mc.data["id"]=="fpcn73-2019-02-08-2045-r73.5":
@@ -183,30 +182,31 @@ def compare_all_with_orig(jsonlFN,rateCompare):
     return nb
 
 ##  For evaluation
-def getNumericTokens(toks):
-    return [tok for period in toks 
-             for sent in toks[period] 
-                 for tok in sent if re.fullmatch(r"\b\d+(\.\d+)?\b",tok)]
-
-def compareNT(refNT,jsrNT):
-    (editDist,editOps)=compareLevenshtein(" ".join(jsrNT)," ".join(refNT),equals=lambda s1,s2:s1==s2)
-    # print("ref:",refNT)
-    # print("gen:",jsrNT)
-    # print("dist:%d score=%5.2f"%(editDist,editDist/len(refNT)))
-    # print(editOps)
-    return editDist/len(refNT)
+# def getNumericTokens(toks):
+    # return [tok for period in toks 
+             # for sent in toks[period] 
+                 # for tok in sent if re.fullmatch(r"\b\d+(\.\d+)?\b",tok)]
+                 #
+# def compareNT(refNT,jsrNT):
+    # (editDist,editOps)=compareLevenshtein(" ".join(jsrNT)," ".join(refNT),equals=lambda s1,s2:s1==s2)
+    # # print("ref:",refNT)
+    # # print("gen:",jsrNT)
+    # # print("dist:%d score=%5.2f"%(editDist,editDist/len(refNT)))
+    # # print(editOps)
+    # return editDist/len(refNT)
 
             
 startTime=process_time()
 
-def evaluate(jsonlFN,lang):
+def evaluate(jsonlFile,lang):
     from nltk.tokenize import word_tokenize,sent_tokenize
     from arpi_eccc.nlg_evaluation import bleu_evaluation
     nltkLang={'en':'english','fr':'french'}[lang]
     reference=[]
     gen_results=[]
     # numericDiffs=0
-    for line in open(jsonlFN,"r",encoding="utf-8"):
+    jsonlFile.seek(0) # ensure to start at the beginning of the file when called the second time
+    for line in jsonlFile:
         mc=MeteoCode(json.loads(line))
         reference.append(mc.data[lang]["tok"])
         # refNT=getNumericTokens(mc.data[lang]["tok"])
@@ -222,7 +222,6 @@ def evaluate(jsonlFN,lang):
             print("%6.2f :: %6d"%(process_time()-startTime,len(reference)))
     print("*** reference:%d generated:%d"%(len(reference),len(gen_results)))
     # print("%6.2f ::*** numeric differences:%5.3f %5.2f"%(process_time()-startTime,numericDiffs,numericDiffs/len(reference)))
-    # ...now we can evaluate jsRealB using the two lists created above.
     evaluation = bleu_evaluation(gen_results, reference)
     for period in ['today', 'tonight', 'tomorrow', 'tomorrow_night']:
         if evaluation[period]!=-1:
@@ -230,23 +229,52 @@ def evaluate(jsonlFN,lang):
     print()
     print(f"{(process_time()-startTime):6.2f} Global score is {evaluation['global']:.3f}")
     
+def usage(mess):
+    print(mess)
+    print("usage: pubpro [-b int] [-c float] [-e] [jsonl file]")
+    sys.exit()
 
-
-def main(jsonlFN,nbBulletins,rateCompare,doEval):
+def main(jsonlFile,nbBulletins,rateCompare,doEval):
     if nbBulletins!=0:
-        generate_bulletins(jsonlFN,nbBulletins)
+        generate_bulletins(jsonlFile,nbBulletins)
     if rateCompare!=0:
-        nb=compare_all_with_orig(jsonlFN,rateCompare)
+        nb=compare_all_with_orig(jsonlFile,rateCompare)
         print(f"{nb} compared bulletins")
     if doEval:
         print("English")
-        evaluate(jsonlFN,"en")
+        evaluate(jsonlFile,"en")
         print("Français")
-        evaluate(jsonlFN,"fr")
+        evaluate(jsonlFile,"fr")
 
 if __name__ == '__main__':
-    main(sys.argv[1] if len(sys.argv)>1 else
-        # "/Users/lapalme/Documents/GitHub/arpi_eccc/data/arpi-2021-train-1000.jsonl",
-        "/Users/lapalme/Desktop/scribe_IVADO/arpi-2021_test.jsonl",
-        0,0.005,False)
+    argv=sys.argv
+    nb=len(argv)
+    if nb==1:
+        main(open("data/arpi-2021-train-1000.jsonl","r",encoding="utf-8"),0,0.01,False)
+    else:
+        # parse arguments
+        nbBulletins=0
+        rateCompare=0
+        doEval=False
+        jsonlFile=sys.stdin
+        i=1
+        while i<nb:
+            argi=argv[i]
+            if argi.startswith("-"):
+                if argi=="-h": usage("")
+                elif argi=="-b":
+                    i+=1
+                    if i==nb : usage("missing number after -b")
+                    else: nbBulletins=int(argv[i])
+                elif argi=="-c":
+                    i+=1
+                    if i==nb : usage("missing number after -c")
+                    else: rateCompare=float(argv[i])
+                elif argi=="-e":
+                    doEval=True
+                else: usage ("unknown argument:",argi)
+            i+=1
+        if i<nb:
+            jsonlFile=open(argv[i],"r",encoding="utf-8")                    
+        main(jsonlFile,nbBulletins,rateCompare,doEval)
     
