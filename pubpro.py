@@ -7,12 +7,12 @@
 
 ## This version only uses Python string formatting for the templates
 
-import sys,re,textwrap, json, locale
+import sys,re,textwrap, json, locale,random
 from time import process_time
 
 from datetime import datetime,timedelta
-from ECdata import get_forecast_area, periods, get_period_name
-# from arpi_eccc.utils import get_delta_with_utc, get_time_interval_for_period
+from ECdata import get_forecast_area, periods, get_period_name, warnings
+from arpi_eccc.utils import get_delta_with_utc, get_time_interval_for_period
 from MeteoCode import MeteoCode
 from forecast import forecast_period
 from ppJson import ppJson
@@ -56,10 +56,34 @@ def title_block(mc,lang):
         s2=f"Les prochaines prévisions seront émises à {nTime} {tzS}." 
     return [s1,s2,""]
 
+
 def forecast_regions(mc,lang):
     if trace: print("forecast_regions")
     regions=mc.get_region_names(lang)
     regions[-1]=regions[-1]+"."# add full stop at the end of regions
+
+    def addWarning(w): # recursive adding of possible embedded warnings
+        message=warnings[w[4]][lang]
+        regions.append(f"{message[0].upper()+message[1:]} warning in effect." if lang=="en" else
+                       f"Avertissement de {message} en vigueur.")
+        if len(w)>5 and isinstance(w[5],list):
+            print("*** embedded warning")
+            addWarning(w[5])
+        
+    warning=mc.get_warning()
+    if warning!=None:# add warning at the end of the regions
+        # check that the warning is in effect in the range of the bulletins of the day
+        warningStart=warning[0]
+        warningEnd  =warning[1]
+        bulletinPeriods=list(mc.data["en"]["tok"].keys())
+        bulletinsStart=get_time_interval_for_period(mc.data, bulletinPeriods[0])[0]
+        bulletinsEnd  =get_time_interval_for_period(mc.data, bulletinPeriods[2])[1]
+        # print("*** WARNING: %s: warning(%s,%s): bulletin(%s,%s)"
+              # %(warning,warningStart,warningEnd,bulletinsStart,bulletinsEnd))
+        if warningEnd < bulletinsStart or warningStart>bulletinsEnd:
+            return regions
+        addWarning(warning)
+        
     return regions
 
 
@@ -67,7 +91,6 @@ def forecast_text(mc,lang):
     """ Section 2.2.2 """
     if trace: print("forecast_text")
     issueDT=mc.get_issue_date()
-    periodsFC=periods[:3] if issueDT.hour<15 else periods[1:]
     tomorrow=issueDT+timedelta(days=1)
     periodFC=[]
     for period in mc.data[lang]["tok"]:
@@ -82,11 +105,8 @@ def end_statement(lang):
 def regular_forecast(mc,lang):
     """ Sect 2.2 """
     text=[
-#         communication_header(mc,lang),
-#         title_block(mc,lang),
         forecast_regions(mc,lang),
         forecast_text(mc,lang),
-#         end_statement(lang),
      ]    
     gen="\n".join([textwrap.fill(line,width=70, subsequent_indent=" ") 
                    for lines in text for line in lines if line!=None])
@@ -104,34 +124,32 @@ def generate_bulletin(mc,lang):
     return "\n".join([textwrap.fill(line,width=70, subsequent_indent=" ") 
                    for lines in text for line in lines if line!=None])
     
-def generate_bulletins(jsonlFN,max=-1):
+def generate_bulletins(jsonlFN,nb=-1):
     """ Sect 2.2 """
     for line in open(jsonlFN,"r",encoding="utf-8"):
         mc=MeteoCode(json.loads(line))    
         print(generate_bulletin(mc,"en"))
         print(generate_bulletin(mc,"fr"))
         print("===")
-        max-=1
-        if max==0:
+        nb-=1
+        if nb==0:
             break
 
 ##  compare three periods only and display result and  original in parallel 
 def compare_with_orig(mc,lang):
     origB=mc.get_original_bulletin(lang)
     text=[
-#         communication_header(mc,lang),
-#         title_block(mc,lang),
         forecast_regions(mc,lang),
         forecast_text(mc,lang),
-#         end_statement(lang),
-     ]    
+    ]    
     genB = "\n".join([textwrap.fill(line,width=70, subsequent_indent=" ") 
                    for lines in text for line in lines if line!=None])
-    ### output comparaison with original
+    ### output comparison with original
     
     fmt="%-72s|%s"
-    res=[fmt%("*** Generated ***","*** Original ***")]
-    periodSplitRE=re.compile(r"\n(?=[A-Z])")
+    res=[fmt%("*** Generated ***" if lang=="en" else "*** Généré ***",
+              "*** Original ***")]
+    periodSplitRE=re.compile(r"\n(?=[A-Z][-' A-Za-z]+\.\.)")
     for gen,orig in zip(periodSplitRE.split(genB),periodSplitRE.split(origB)):
         genL=gen.split("\n")
         origL=orig.split("\n")
@@ -145,23 +163,24 @@ def compare_with_orig(mc,lang):
         elif lg>lo:
             for i in range(lo,lg):
                 res.append(fmt%(genL[i],""))
-    return "\n".join(res)
+    return "\n"+"\n".join(res)
 
-def compare_all_with_orig(jsonlFN,max=-1):
+def compare_all_with_orig(jsonlFN,rateCompare):
     no=0
+    nb=0
     for line in open(jsonlFN,"r",encoding="utf-8"):
         no+=1
         mc=MeteoCode(json.loads(line))
-        if re.match(r"fpcn74-2019-12-.*",mc.data["id"]):
+        # if mc.data["id"]=="fpcn73-2019-02-08-2045-r73.5":
+        if random.random()<rateCompare:
             print("%d :: %s"%(no,mc.data["id"]))
-            # ppJson(sys.stdout,mc.data)   
+            for period in mc.data["en"]["tok"]:
+                mc.show_data(period)
             print(compare_with_orig(mc, "en"))
-            # print("---")
-            # print(compare_with_orig(mc, "fr"))
-            print("===")
-        max-=1
-        if max==0:break
-
+            print(compare_with_orig(mc, "fr"))
+            print("="*145,"\n")
+            nb+=1
+    return nb
 
 ##  For evaluation
 def getNumericTokens(toks):
@@ -180,49 +199,54 @@ def compareNT(refNT,jsrNT):
             
 startTime=process_time()
 
-def evaluate(jsonlFN,lang,max=-1):
+def evaluate(jsonlFN,lang):
     from nltk.tokenize import word_tokenize,sent_tokenize
     from arpi_eccc.nlg_evaluation import bleu_evaluation
     nltkLang={'en':'english','fr':'french'}[lang]
     reference=[]
     gen_results=[]
-    numericDiffs=0
+    # numericDiffs=0
     for line in open(jsonlFN,"r",encoding="utf-8"):
         mc=MeteoCode(json.loads(line))
         reference.append(mc.data[lang]["tok"])
-        refNT=getNumericTokens(mc.data[lang]["tok"])
+        # refNT=getNumericTokens(mc.data[lang]["tok"])
         genTok={}
         for period in mc.data[lang]["tok"]:
             period_text=forecast_period(mc,period,lang)
             genTok[period]=[word_tokenize(sent,nltkLang) for sent in sent_tokenize(period_text, nltkLang)]
         gen_results.append(genTok)
         # print(genTok)
-        genNT=getNumericTokens(genTok)
-        numericDiffs+=compareNT(refNT,genNT)
-        if len(reference)%100==0:
-            print("%6.2f :: %d %5.2f"%(process_time()-startTime,len(reference),numericDiffs/len(reference)))
-        if len(reference) >= 100:
-            break
-    print("*** reference:%d"%len(reference))
-    # ppJson(sys.stdout,reference)
-    print("*** jsRealB results:%d"%len(gen_results))
-    # ppJson(sys.stdout,gen_results)
-    print("%6.2f ::*** numeric differences:%5.3f %5.2f"%(process_time()-startTime,numericDiffs,numericDiffs/len(reference)))
+        # genNT=getNumericTokens(genTok)
+        # numericDiffs+=compareNT(refNT,genNT)
+        if len(reference)%1000==0:
+            print("%6.2f :: %6d"%(process_time()-startTime,len(reference)))
+    print("*** reference:%d generated:%d"%(len(reference),len(gen_results)))
+    # print("%6.2f ::*** numeric differences:%5.3f %5.2f"%(process_time()-startTime,numericDiffs,numericDiffs/len(reference)))
     # ...now we can evaluate jsRealB using the two lists created above.
     evaluation = bleu_evaluation(gen_results, reference)
     for period in ['today', 'tonight', 'tomorrow', 'tomorrow_night']:
         if evaluation[period]!=-1:
             print(f"For bulletin period {period}, BLEU score is {evaluation[period]:.3f} on a scale from 0 to 1")
     print()
-    print(f"Global score is {evaluation['global']:.3f}")
+    print(f"{(process_time()-startTime):6.2f} Global score is {evaluation['global']:.3f}")
     
 
 
-def main(jsonlFN,max):
-    # generate_bulletins(jsonlFN,max)
-    compare_all_with_orig(jsonlFN,max)
-    # evaluate(jsonlFN,"en",max)
+def main(jsonlFN,nbBulletins,rateCompare,doEval):
+    if nbBulletins!=0:
+        generate_bulletins(jsonlFN,nbBulletins)
+    if rateCompare!=0:
+        nb=compare_all_with_orig(jsonlFN,rateCompare)
+        print(f"{nb} compared bulletins")
+    if doEval:
+        print("English")
+        evaluate(jsonlFN,"en")
+        print("Français")
+        evaluate(jsonlFN,"fr")
 
 if __name__ == '__main__':
     main(sys.argv[1] if len(sys.argv)>1 else
-        "/Users/lapalme/Documents/GitHub/arpi_eccc/data/arpi-2021-train-1000.jsonl",100)
+        # "/Users/lapalme/Documents/GitHub/arpi_eccc/data/arpi-2021-train-1000.jsonl",
+        "/Users/lapalme/Desktop/scribe_IVADO/arpi-2021_test.jsonl",
+        0,0.005,False)
+    

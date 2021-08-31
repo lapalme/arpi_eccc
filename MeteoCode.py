@@ -5,10 +5,22 @@ Created on 21 août 2021
 '''
 from datetime import datetime, timedelta
 from arpi_eccc.utils import get_delta_with_utc, get_time_interval_for_period
+from ppJson import ppJson
+from ECdata import warnings
+import json, sys
 
 class MeteoCode(object):
     '''
     Keep info about the Meteocode and provide methods to query it
+    on top of the "administrative information", 
+    weather info encoded into fields
+    a field is a fieldname associated with a list of terms
+    a term is a list of values 
+       the first value is the beginHour
+       the second value is the endHour
+       other values depending of the field kind
+       can be terminated by a possible embedded list which describes an "exception".
+    
     '''
 
     def __init__(self, json):
@@ -42,6 +54,10 @@ class MeteoCode(object):
         else:
             return None
     
+    def get_warning(self):
+        if "avert" not in self.data: return None 
+        return self.data["avert"][0]
+    
     #### HACK: specific for Ontario and Québec
     def get_timezone(self,lang):
         if lang=="en":
@@ -49,42 +65,94 @@ class MeteoCode(object):
         else:
             return "HAE" if self.delta==4 else "HNE"
     
-    
+    ### show all info for a given period
+    ###    times (ending with h) are shown in local time 
+    ignoredFields=set(["header","names-en","names-fr","regions","en","fr","id"])
+    def show_data(self,period):
+        def hour(h): ##  hour string in more readable manner suffixed with "h"
+            h=h-self.delta
+            if h<24: return str(h)+"h" # negative numbers are output as is
+            h24=h//24 # output with a prefix indicating the day
+            return (["","+","⧺","⧻"][h24] if h24<4 else "%d*"%h24)+str(h%24)+"h"
+        def show_terms(terms):
+            return ", ".join(["(%4s,%4s):[%s]"%(hour(term[0]),hour(term[1])," ".join(map(str,term[2:]))) for term in terms])
+            
+        (beginHour,endHour)=get_time_interval_for_period(self.data, period)
+        print("%s (%4s,%4s):[%d,%d) delta=%d  :: %s :: %s"%(
+                period,hour(beginHour),hour(endHour), beginHour,endHour,self.delta,self.data["id"],self.get_issue_date()))
+        for field in self.data:
+            if field not in self.ignoredFields:
+                terms=self.extract_terms(period,field)
+                if terms!=None:
+                    print("%-11s : %s"%(field,show_terms(terms)))
+        print("----")
+            
     ### query information
-    def extract_range(self,period, field,column=None):
+    
+    def extract_terms(self,period, field):
         (beginHour,endHour)=get_time_interval_for_period(self.data, period)
         if field not in self.data: return None
-        infos=self.data[field]
+        terms=self.data[field]
         if field=="prob": # prob has a peculiar structure (ignore first two elements
-            infos=infos[2:]
-        nb=len(infos)
+            terms=terms[0][2:]
+        nb=len(terms)
         i=0
-        while i<nb and infos[i][1] < beginHour:i+=1
+        while i<nb and terms[i][1] <= beginHour:i+=1
         startI=i
-        while i<nb and infos[i][0] < endHour:
+        while i<nb and terms[i][0] < endHour:
             i+=1
         if startI==i:return None ## no line found
-        lines=infos[startI:i]
-        if column==None:return lines
-        return [line[column] for line in lines]
+        terms=terms[startI:i]
+        return terms
     
-    
-    ### ciel: start end neb-start neb-end {ceiling-height}
-    def get_sky_condition(self,period,column=None):
-        return self.extract_range(period,"ciel",column)
-
 
     ## expand value given at idx in tuples for each hour for all hours within a range
     def expand_range(self,tuples,idx,beginHour,endHour):
-        res=[]
-        i=0
-        res.extend([tuples[i][idx]]*(tuples[i][1]-beginHour))
+        if len(tuples)==1: # all in the first tuple
+            return [tuples[0][idx]]*(endHour-beginHour)
+        res=[tuples[0][idx]]*(tuples[0][1]-beginHour)
+        i=1
         while i<len(tuples)-1:
-            i+=1
             res.extend([tuples[i][idx]]*(tuples[i][1]-tuples[i][0]))
-        res.extend([tuples[i][idx]]*(endHour-tuples[i][1]))
+            i+=1
+        res.extend([tuples[i][idx]]*(endHour-tuples[i][0]))
+        return res
+    
+    # def get_line(self,line,columns):
+        # res=[line[0],line[1]]
+        # res.extend([line[c] for c in columns])
+        # return res
+     
+    def build_table(self,period,field,col):
+        (beginHour,endHour)=get_time_interval_for_period(self.data, period)
+        if field not in self.data: return None
+        terms=self.extract_terms(period, field)
+        if field=="prob": # prob has a peculiar structure (ignore first two elements
+            terms=terms[0][2:]
+        nb=len(terms)
+        if nb==0: return None
+        if nb==1:
+            return [terms[0][col]]*(endHour-beginHour)
+        res=[terms[0][col]]*(terms[0][1]-beginHour)
+        i=1
+        while i<nb-1:
+            res.extend([terms[i][col]]*(terms[i][1]-terms[i][0]))
+            i+=1
+        res.extend([terms[i][col]]*(endHour-terms[i][0]))
         return res
         
+    ### ciel: start end neb-start neb-end {ceiling-height}
+    def get_sky_condition(self,period):
+        return self.extract_terms(period,"ciel")
+    
+    def get_precipitation(self,period):
+        return self.extract_terms(period, "pcpn")
+
+    def get_precipitation_probabilities(self,period):
+        return self.extract_terms(period, "prob")
+    
+    def get_precipitation_amount(self,period):
+        return self.extract_terms(period,"accum")
     
     # temp : start end trend value
         # trend : "baisse" | "hausse" | "pi" | "max" | "min" | "stationnaire" =>
@@ -92,35 +160,19 @@ class MeteoCode(object):
         # value : int degree Celsius
     # returns a table of all temperatures by hour, from beginHour to endHour
     # it expands intermediate values to ease their analysis
+    
+    def get_temperature_values(self,period):
+        return self.build_table(period,"temp",3)
+        
+    def get_climat_temp(self,period):
+        return self.extract_terms(period,"climat_temp")
+        
     def get_temperature(self,period):
-        (beginHour,endHour)=get_time_interval_for_period(self.data, period)
-        temps=[]
-        tempRanges=self.extract_range(period, "temp")
-        print("tempRanges")
-        print(tempRanges)
-        if tempRanges==None: return None
-        # probRanges=self.extract(period,"prob")
-        temps=self.expand_range(tempRanges, 3, beginHour, endHour)
-        # i=0
-        # temps.extend([tempRanges[0][3]]*(tempRanges[0][1]-beginHour))
-        # for i in range(1,len(tempRanges)-1):
-        #     temps.extend([tempRanges[i][3]]*(tempRanges[i][1]-tempRanges[i][0]))
-        # i=len(tempRanges)-1
-        # temps.extend([tempRanges[i][3]]*(endHour-tempRanges[i][1]))
-        print("temps")
-        print(temps)
-        return temps if len(temps)>0 else None
-    
-    
-    def get_precipitation_amount(self,period):
-        return self.extract_range(period,"accum")
-    
-    def get_precipitation(self,period):
-        return self.extract_range(period,"pcpn")
-    
-    def get_wind_direction(self,period):
-        return self.extract_range(period, "vents")
+        return self.extract_terms(period,"temp")
+        
+    def get_wind(self,period):
+        return self.extract_terms(period, "vents")
     
     def get_uv_index(self,period):
-        return self.extract_range(period,"indice_uv")
+        return self.extract_terms(period,"indice_uv")
     
